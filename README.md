@@ -1,71 +1,59 @@
-# kindle-ai-dev-tools
+# kindle-dev
 
-Scripts and AI agent skills I use for Kindle hacking, plus a list of the tools that get you from a stock Kindle to writing code for it.
+One static binary for a jailbroken Kindle that lets you, or an AI agent, see the screen and drive it over SSH. Screenshot, record, tap, swipe, inject keys and read input events, with nothing else to install on the device.
 
-Everything here assumes a jailbroken Kindle you can SSH into. If you are not there yet, start with the jailbreak guides below.
+## Install
 
-## What's in here
-
-| Path | What it does |
-|---|---|
-| `skills/kindle-remote/` | Claude Code skill that lets an agent see and drive the Kindle screen over SSH, so it can check its own UI changes |
-| `scripts/kindle-remote.py` | Host side of the above. Screenshot, record mp4/gif, tap, swipe, scroll and inject keys over SSH |
-| `scripts/xtap.py` | Runs on the Kindle. Pure Python X11 XTEST tap injection, no Xlib needed |
-| `scripts/gamepad_reader.py` | Dumps raw evdev events from any input device, decoded |
-| `scripts/gamepad_reader.c` | Same thing in C, for when there is no Python on the device |
-| `scripts/gamepad_hexdump.sh` | Same thing with busybox `hexdump`, nothing to install |
-| `scripts/download_dictionaries.sh` | Downloads English StarDict dictionaries for KOReader |
-| `cross-compile/python/` | Docker build for a standalone musl Python 3.10 (with OpenSSL, cffi, cryptography, bumble) for ARMv7 Kindles |
-| `cross-compile/kernel/` | Builds `uhid.ko` and `uinput.ko` against Amazon's GPL kernel source for a given Kindle model |
-
-### Using the skill
-
-Copy it where Claude Code looks for skills and point it at your Kindle.
+Grab `kindle-dev` from the releases, or build it.
 
 ```sh
-cp -r skills/kindle-remote ~/.claude/skills/
-scp scripts/xtap.py kindle:/mnt/us/xtap.py
-export KINDLE_HOST=kindle                 # SSH host or alias
-export KINDLE_XTAP=/mnt/us/xtap.py
-export KINDLE_PYTHON=python3              # whatever Python you have on the device
+rustup target add armv7-unknown-linux-musleabihf
+cargo build --release --target armv7-unknown-linux-musleabihf
+scp target/armv7-unknown-linux-musleabihf/release/kindle-dev kindle:/mnt/us/kindle-dev
 ```
 
-Host needs Pillow, and ffmpeg for recording. Then ask the agent to take a screenshot of the Kindle and it will take it from there.
+## Usage
 
-XTEST taps only reach the native Kindle UI. KOReader reads evdev directly, so use `swipe` or `key` against it instead of `tap`.
+```sh
+ssh kindle /mnt/us/kindle-dev screenshot > shot.png
+ssh kindle /mnt/us/kindle-dev tap-pct 50 80
+ssh kindle /mnt/us/kindle-dev swipe 850 700 200 700
+ssh kindle /mnt/us/kindle-dev key enter
+ssh kindle /mnt/us/kindle-dev events event1
+```
 
-## Tools
-
-### Getting in
-
-| Tool | What it's for |
+| Command | What it does |
 |---|---|
-| [kindlemodding.org](https://kindlemodding.org/) | Jailbreak guides per firmware, and what to install after |
-| [KindleModding/Hotfix](https://github.com/KindleModding/Hotfix) | Keeps the jailbreak alive across firmware updates |
-| [KindleModding/KPM](https://github.com/KindleModding/KPM) | Kindle Package Manager ([docs](https://kindlemodding.org/kindle-dev/kpm/)) |
-| [KindleTweaks/KindleForge](https://github.com/KindleTweaks/KindleForge) | GUI package manager on the Kindle |
-| [notmarek/kindle-usbnetlite](https://github.com/notmarek/kindle-usbnetlite) | Minimal usbnet, gets you an SSH shell on the Kindle |
+| `screenshot` | Write a PNG of the screen to stdout |
+| `record SECONDS [FPS]` | Write PNG frames to stdout, 4 fps by default |
+| `screen-size` | Print `WIDTHxHEIGHT` |
+| `tap X Y` | Tap pixel coordinates through X11 |
+| `tap-pct X Y` | Tap at a percentage of the screen |
+| `swipe X1 Y1 X2 Y2` | Swipe on the touchscreen through evdev |
+| `scroll-up`, `scroll-down` | Vertical swipe across the middle of the screen |
+| `key KEY [DEVICE]` | Press and release a key, `key-down` and `key-up` for one half |
+| `devices` | List input devices |
+| `events DEVICE` | Print input events until interrupted |
 
-### Apps
+KEY is a Linux input name (`KEY_ENTER`, `BTN_SOUTH`, or just `enter`) or a number. Without DEVICE, `key` picks the device that reports that key.
 
-| Tool | What it's for |
-|---|---|
-| [koreader/koreader](https://github.com/koreader/koreader) | The reader most people end up on, and a good Lua codebase to hack on |
-| [zampierilucas/kindle-hid-passthrough](https://github.com/zampierilucas/kindle-hid-passthrough) | Bluetooth keyboards, page turners and gamepads on Kindle |
-| [zampierilucas/kindle-button-mapper-rs](https://github.com/zampierilucas/kindle-button-mapper-rs) | Map controller and remote buttons to Kindle actions |
+Record to video:
 
-### Development
+```sh
+ssh kindle /mnt/us/kindle-dev record 5 | ffmpeg -f image2pipe -framerate 4 -i - \
+  -c:v libx264 -pix_fmt yuv420p -vf 'pad=ceil(iw/2)*2:ceil(ih/2)*2' clip.mp4
+```
 
-| Tool | What it's for |
-|---|---|
-| [katadelos/eink-emulator](https://github.com/katadelos/eink-emulator) | Run Kindle firmware in QEMU, so you can break things without a device |
-| [NiLuJe/KindleTool](https://github.com/NiLuJe/KindleTool) | Create and extract Kindle update packages |
-| [Amazon GPL source](https://www.amazon.com/gp/help/customer/display.html?nodeId=200203720) | Kernel and GPL sources per Kindle firmware, what `cross-compile/kernel` builds against |
-| [katadelos/linux-3.0.35-lab126](https://github.com/katadelos/linux-3.0.35-lab126) | Kindle kernel tree as git, easier to read than the tarballs |
-| [ftvdb.com Kindle firmware](https://ftvdb.com/kindle/firmware/) | Archive of Kindle firmware images |
-| [google/bumble](https://github.com/google/bumble) | Python Bluetooth stack, what kindle-hid-passthrough is built on |
+## With an AI agent
 
-PRs adding tools or skills are welcome.
+Tell your agent the commands above. The loop that works is to take a screenshot, look at it, tap or swipe, wait a second for the e-ink refresh, and take another screenshot to confirm.
+
+## Things to know
+
+- Taps go through X11, so they only reach the native Kindle UI. KOReader reads evdev directly, so use `swipe` or `key` against it.
+- Swipe coordinates are sent to the touchscreen as screen pixels, which matches current Kindles.
+- KOReader grabs the touchscreen, so `events` on it shows nothing while KOReader runs, even though KOReader still gets the swipes.
+- Framebuffers with 8 and 32 bits per pixel work. Old 4 bit Kindles (K3, K4) do not.
 
 ## License
 

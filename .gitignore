@@ -1,7 +1,1 @@
-cross-compile/python/output/
-cross-compile/python/sysroot/
-cross-compile/kernel/output/
-cross-compile/kernel/source/
-cross-compile/kernel/tarballs/
-*.log
-__pycache__/
+/target/

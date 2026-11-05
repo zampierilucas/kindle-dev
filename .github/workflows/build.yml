@@ -1,0 +1,40 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - run: rustup target add armv7-unknown-linux-musleabihf
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: armv7-musl
+
+      - run: cargo build --release --target armv7-unknown-linux-musleabihf
+
+      - run: |
+          cp target/armv7-unknown-linux-musleabihf/release/kindle-dev .
+          file kindle-dev | grep -q ARM
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: kindle-dev
+          path: kindle-dev
+
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: kindle-dev
+          generate_release_notes: true

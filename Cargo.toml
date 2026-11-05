@@ -1,0 +1,18 @@
+[package]
+name = "kindle-dev"
+version = "0.1.0"
+edition = "2021"
+description = "Screenshot, record, tap, swipe, inject keys and dump input events on a Kindle"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+evdev = "0.12"
+libc = "0.2"
+png = "0.18"
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
